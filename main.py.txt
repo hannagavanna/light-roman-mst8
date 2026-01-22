@@ -1,0 +1,79 @@
+import requests
+import json
+import datetime
+import os
+from telegram import Bot
+
+# Получаем секреты
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+CHAT_ID = os.environ.get("CHAT_ID")
+ADDRESS = os.environ.get("ADDRESS")
+
+bot = Bot(token=BOT_TOKEN)
+
+# Файл для хранения предыдущего состояния
+STATE_FILE = "state.json"
+
+# Ссылка на график ДТЕК (пример для Киева)
+URL = "https://www.dtek-kem.com.ua/RU/shutdowns"
+
+def load_state():
+    if os.path.exists(STATE_FILE):
+        with open(STATE_FILE, "r") as f:
+            return json.load(f)
+    return {"status": None, "last_change": None}
+
+def save_state(state):
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f)
+
+def get_status():
+    # Запрашиваем график с сайта
+    resp = requests.get(URL)
+    data = resp.json()  # предполагается, что API возвращает JSON
+    # Находим график для нашего адреса
+    for entry in data.get("data", []):
+        if entry.get("address") == ADDRESS:
+            return entry.get("status"), entry.get("next_change")  # "on"/"off", время следующего изменения
+    return None, None
+
+def format_message(status, last_change, next_change):
+    now = datetime.datetime.now()
+    if last_change:
+        last_time = datetime.datetime.fromisoformat(last_change)
+        duration = now - last_time
+        hours = duration.seconds // 3600
+        minutes = (duration.seconds % 3600) // 60
+        duration_text = f"{hours} ч {minutes} м"
+    else:
+        duration_text = "–"
+
+    if status == "on":
+        status_text = "🟢 Свет включили"
+    elif status == "off":
+        status_text = "🔴 Свет отключили"
+    else:
+        status_text = "❓ Статус неизвестен"
+
+    next_text = f"⏰ Ориентировочное следующее изменение: {next_change}" if next_change else ""
+
+    return f"{status_text}\n🕒 Было {duration_text}\n📍 {ADDRESS}\n{next_text}\n(по графику ДТЕК)"
+
+def main():
+    state = load_state()
+    status, next_change = get_status()
+    if status is None:
+        print("Не удалось получить статус")
+        return
+
+    if status != state.get("status"):
+        # Статус изменился
+        message = format_message(status, state.get("last_change"), next_change)
+        bot.send_message(chat_id=CHAT_ID, text=message)
+        # Обновляем состояние
+        save_state({"status": status, "last_change": datetime.datetime.now().isoformat()})
+    else:
+        print("Статус не изменился")
+
+if __name__ == "__main__":
+    main()
