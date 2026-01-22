@@ -5,10 +5,9 @@ import os
 from telegram import Bot
 
 # Получаем секреты
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-CHAT_ID = os.environ.get("CHAT_ID")
-ADDRESS = os.environ.get("ADDRESS")
-
+BOT_TOKEN = "123456789:ABCdefGhIjklMNOpQRsTUVwxyZ"  # токен от BotFather
+CHAT_ID = "-1001234567890"  # ID вашего канала
+ADDRESS = "Киев, Князя Романа Мстиславича 8"  # ваш адрес
 bot = Bot(token=BOT_TOKEN)
 
 # Файл для хранения предыдущего состояния
